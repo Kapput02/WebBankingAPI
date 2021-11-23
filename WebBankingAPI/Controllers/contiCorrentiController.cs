@@ -7,6 +7,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 using WebBankingAPI.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace WebBankingAPI.Controllers
 {
@@ -20,7 +21,7 @@ namespace WebBankingAPI.Controllers
         [Authorize]
         public ActionResult Get()
         {
-            using (WebBankingContext model = new WebBankingContext())
+            using ( WebBankingContext model = new WebBankingContext())
             {
                 var idUtente = HttpContext.User.Claims.FirstOrDefault(x => x.Type == "id").Value;
                 User candidate = model.Users.FirstOrDefault(q => q.Id == Int32.Parse(idUtente));
@@ -111,6 +112,11 @@ namespace WebBankingAPI.Controllers
                 if (contoInviante == null) return NotFound("Conto inserito non valido");
                 if (candidate.IsBanker || contoInviante.FkUser == int.Parse(idUtente))
                 {
+                    //BankAccount contoSaldo = model.BankAccounts.Include(i => i.AccountMovements).FirstOrDefault(o => o.Id == id);
+                    //if (contoSaldo == null) return Problem();
+                    //double? saldo = contoSaldo.AccountMovements.Sum(i => (i.In == null) ? 0 : i.In);
+                    //saldo -= contoSaldo.AccountMovements.Sum(i => (i.In == null) ? i.Out : 0);
+                    //if ((saldo - bonifico.Importo) < 0) return Problem("saldo insufficiente");
                     AccountMovement movimentoInviato = new AccountMovement { Date = DateTime.UtcNow, Out = bonifico.Importo, Description = "Bonifico inviato", FkBankAccount = contoInviante.Id };
                     var contoRicevente = model.BankAccounts.Select(s => new { s.Id, s.Iban, s.FkUser }).FirstOrDefault(i => i.Iban == bonifico.Iban);
                     if (contoRicevente != null)
@@ -192,6 +198,28 @@ namespace WebBankingAPI.Controllers
                 model.BankAccounts.Remove(candidate);
                 model.SaveChanges();
                 return Ok();
+            }
+        }
+       public double? CalcolaSaldo(BankAccount candidate)
+        {
+
+            if (candidate == null) return 0;
+            double? saldo = candidate.AccountMovements.Sum(i => (i.In == null) ? 0 : i.In);
+            saldo -= candidate.AccountMovements.Sum(i => (i.In == null) ? i.Out : 0);
+            return saldo;
+        }
+        [HttpGet("{id}/saldo")]
+        [Authorize]
+        public ActionResult Saldo(int id)
+        {
+            using (WebBankingContext model = new WebBankingContext())
+            {
+                BankAccount candidate = model.BankAccounts.Include(i=>i.AccountMovements).FirstOrDefault(o => o.Id == id);
+                if (candidate == null) return Problem();
+                double? saldo = candidate.AccountMovements.Sum(i => (i.In == null) ? 0 : i.In);
+                saldo -= candidate.AccountMovements.Sum(i => (i.In == null) ? i.Out : 0);
+                return Ok(saldo);
+                
             }
         }
     }
