@@ -53,7 +53,7 @@ namespace WebBankingAPI
                 User candidate = model.Users.FirstOrDefault(q => q.Id == Int32.Parse(idUtente));
                 candidate.LastLogout = DateTime.UtcNow;
                 model.SaveChanges();
-                return Ok(candidate);
+                return Ok("Logout avvenuto con successo. La sessione è durata "+ (candidate.LastLogout-candidate.LastLogin));
             }
         }
     }
